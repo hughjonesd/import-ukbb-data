@@ -49,6 +49,12 @@ alto_file <- file.path(data_dir, "spouse_pair_info",
 ashe_income_file <- file.path(data_dir, 
                       "SOC-income", "Occupation (4) Table 14.7a   Annual pay - Gross 2007.xls") 
 
+# utility function:
+negative_to_na <- function (x) {
+  x[x < 0] <- NA
+  x
+}
+
 
 import_famhist <- function (famhist_files, pgs_dir) {
 
