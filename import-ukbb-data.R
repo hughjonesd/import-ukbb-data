@@ -91,7 +91,8 @@ import_famhist <- function (famhist_files, pgs_dir) {
   fake_csv_string <- paste0(fake_csv_string, "\n")
   col_types_22662 <- spec_csv(fake_csv_string, 
                                 col_types = cols(
-                                  .default = col_character()
+                                  # maybe save time by skipping these long cols:
+                                  .default = col_skip() 
                                 )
                               )
   col_types$cols <- c(col_types$cols, col_types_22662$cols)
