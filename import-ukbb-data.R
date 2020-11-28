@@ -56,6 +56,25 @@ negative_to_na <- function (x) {
 }
 
 
+
+import_pcs <- function (pcs_file) {
+  pcs <- read_table2(pcs_file)
+  pc_names <- grep("PC", names(pcs), value = TRUE)
+  pcs[pc_names] <- scale(pcs[pc_names])
+  
+  pcs
+}
+
+
+import_pcs_40 <- function (pcs_40_file) {
+  pcs_40 <- read_csv(pcs_40_file)
+  pc_names <- paste0("PC", 1:40)
+  pcs_40[pc_names] <- scale(pcs_40[pc_names])
+  
+  pcs_40
+}
+
+
 import_famhist <- function (famhist_files, pgs_dir) {
 
   col_types <- cols(
