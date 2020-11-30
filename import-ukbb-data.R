@@ -242,7 +242,7 @@ clean_famhist <- function (famhist, score_names, sib_groups) {
   famhist %<>% mutate(across(
       c(age_fulltime_edu, starts_with(c(
         "f.2946", "f.1845", "f.2754", "f.738",  "f.2764", "f.2405", "f.2734",
-        "f.2149", "f.1873", "f.1883", "f.2784", "f.2794", "f.709", 
+        "f.2149", "f.1873", "f.1883", "f.2784", "f.2794", "f.709", "f.2040",
         "f.699", "f.3872", "f.728", "f.670", "f.680",
         "f.5057", "birth_lon", "birth_lat"
       ))), 
@@ -284,7 +284,13 @@ clean_famhist <- function (famhist, score_names, sib_groups) {
   famhist$with_partner[famhist$n_in_household == 1] <- FALSE
   famhist$with_partner[famhist$f.6141.0.0 == -3] <- NA
   
-
+  famhist$n_partners <- pmax(famhist$f.2149.0.0, famhist$f.2149.1.0, 
+    famhist$f.2149.2.0, na.rm = TRUE)
+  # f.2139 is age at first sexual intercourse. -2 means "never had sex";
+  # the question about number of partners was then not asked.
+  famhist$n_partners[famhist$f.2139 == -2] <- 0
+  famhist$lo_partners <- famhist$n_partners <= 3
+  
   famhist$age_fte_cat <- santoku::chop(famhist$age_fulltime_edu,
                                        c(16, 18),
                                        c("< 16", "16-18", "> 18"))
@@ -302,6 +308,18 @@ clean_famhist <- function (famhist, score_names, sib_groups) {
                       )
   famhist$age_flb_cat <- santoku::chop_equally(famhist$age_flb, 3, 
                                                labels = lbl_discrete("-"))
+  
+  famhist$flb_cat <- santoku::fillet(famhist$age_flb, c(13, 20, 23, 26, 30, 47))
+  famhist$flb_cat %<>% forcats::fct_expand("No children")
+  famhist$flb_cat[famhist$sex == 0 &  famhist$n_children == 0] <- "No children"
+  
+  famhist$urbrur <- car::recode(famhist$f.20118.0.0,
+          "c(1, 5, 11, 12) = 'urban';
+          c(2, 6, 13, 14, 15)  = 'town';
+          c(3, 4, 7, 8, 16, 17, 18) = 'rural';
+          9 = NA_character_
+          "
+        )
   
   # full brothers and sisters
   famhist$nbro <- pmax(famhist$f.1873.0.0, famhist$f.1873.1.0, 
@@ -360,6 +378,18 @@ clean_famhist <- function (famhist, score_names, sib_groups) {
 }
 
 
+add_ashe_income <- function (famhist, ashe_income) {
+  famhist %<>% 
+        mutate(f.22617.0.0 = as.character(f.22617.0.0)) %>% 
+        left_join(ashe_income, by = c("f.22617.0.0" = "Code")) %>% 
+        select(-Description, -mean_pay) %>% 
+        mutate(first_job_pay = median_pay/1000) %>% 
+        select(-median_pay)
+  
+  famhist
+}
+
+
 compute_resid_scores <- function (famhist, pcs, score_names) {
   famhist <- left_join(famhist, pcs, by = c("f.eid" = "eid"))
   resid_scores <- data.frame(f.eid = famhist$f.eid)
@@ -381,6 +411,32 @@ subset_resid_scores <- function (resid_scores_raw, famhist, score_names) {
   resid_scores[paste0(score_names, "_resid")] %<>% scale()
   
   resid_scores
+}
+
+
+
+add_data_to_pairs <- function (pairs_df, famhist, resid_scores, 
+                                 suffix = c(".x", ".y")) {
+
+    fhs <- famhist %>% 
+                    left_join(resid_scores, by = "f.eid") %>% 
+                    dplyr::select(
+                      f.eid, f.6138.0.0, matches("f.6141"), female,
+                      matches("_resid$"), nbro, nsis, sib_group,
+                      n_sibs, birth_order, university, age_at_recruitment, YOB,
+                      age_fulltime_edu, age_fte_cat, income_cat, 
+                      birth_mon, n_children, fath_age_birth, moth_age_birth,
+                      first_job_pay, sr_health, illness, fluid_iq, height, 
+                      f.20074.0.0, f.20075.0.0, f.699.0.0,
+                      f.709.0.0, f.670.0.0, f.680.0.0, f.52.0.0, f.53.0.0, 
+                      f.54.0.0, f.6139.0.0, f.6140.0.0, f.728.0.0
+                    )
+
+  pairs_df %<>% 
+            left_join(fhs, by = c(eid.x = "f.eid")) %>% 
+            left_join(fhs, by = c(eid.y = "f.eid"), suffix = suffix)
+
+  pairs_df
 }
 
 
