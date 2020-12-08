@@ -379,12 +379,48 @@ clean_famhist <- function (famhist, score_names, sib_groups) {
 
 
 add_ashe_income <- function (famhist, ashe_income) {
+  # find the last job
+
+  famhist %<>% 
+        mutate(
+          across(matches("22617"), Negate(is.na), .names = "{.col}_not_na")
+        ) %>% 
+        mutate(
+          last_job = rowSums(across(matches("22617.*_not_na"))),
+          last_job = ifelse(last_job == 0, NA_real_, last_job)
+        ) %>% 
+        select(-matches("22617.*_not_na"))
+  
+  job_index_matrix <- cbind(1:nrow(famhist), famhist$last_job)
+  
+  famhist$last_job_soc <- as.data.frame(famhist %>% select(matches("22617")))[job_index_matrix]
+  
   famhist %<>% 
         mutate(f.22617.0.0 = as.character(f.22617.0.0)) %>% 
         left_join(ashe_income, by = c("f.22617.0.0" = "Code")) %>% 
-        select(-Description, -mean_pay) %>% 
-        mutate(first_job_pay = median_pay/1000) %>% 
-        select(-median_pay)
+        select(-Description, -median_pay) %>% 
+        mutate(first_job_pay = mean_pay/1000) %>% 
+        select(-mean_pay)
+  
+  famhist %<>% 
+        mutate(last_job_soc = as.character(last_job_soc)) %>% 
+        left_join(ashe_income, by = c("last_job_soc" = "Code")) %>% 
+        select(-Description, -median_pay) %>% 
+        mutate(last_job_pay = mean_pay/1000) %>% 
+        select(-mean_pay)
+  
+  famhist %<>% 
+        mutate(
+          # quick way to take first 4 characters:
+          cur_job_soc = as.character(floor(f.132.0.0/1000))
+        ) %>% 
+        left_join(ashe_income, by = c("cur_job_soc" = "Code")) %>% 
+        select(-Description, -median_pay) %>% 
+        mutate(
+          cur_job_pay = mean_pay/1000,
+          cur_job_pay = ifelse(is.na(cur_job_pay), last_job_pay, cur_job_pay)
+        ) %>% 
+        select(-mean_pay)
   
   famhist
 }
@@ -440,7 +476,8 @@ add_data_to_pairs <- function (pairs_df, famhist, resid_scores,
 }
 
 
-make_mf_pairs <- function (mf_pairs_file, famhist, resid_scores) {
+make_mf_pairs <- function (mf_pairs_file, famhist, resid_scores, ashe_income) {
+  famhist <- add_ashe_income(famhist, ashe_income)
   
   mf_pairs <- readr::read_csv(mf_pairs_file)
 
@@ -449,6 +486,16 @@ make_mf_pairs <- function (mf_pairs_file, famhist, resid_scores) {
   mf_pairs <- add_data_to_pairs(mf_pairs, famhist, resid_scores, 
                                   suffix = c(".m", ".f"))
 
+  mf_pairs$EA3.m <- mf_pairs$EA3_excl_23andMe_UK_resid.m
+  mf_pairs$EA3.f <- mf_pairs$EA3_excl_23andMe_UK_resid.f
+
+  mf_pairs$couple_id <- paste0(mf_pairs$ID.m, "_", mf_pairs$ID.f)
+  
+  mf_pairs
+}
+
+
+filter_mf_pairs <- function (mf_pairs) {
   # removed f.670 and f.728 because they didn't help predict "having the same kid".
   mf_pairs %<>% filter(
                   f.680.0.0.f  == f.680.0.0.m,  # same rent/own status
@@ -470,13 +517,9 @@ make_mf_pairs <- function (mf_pairs_file, famhist, resid_scores) {
               filter(n() == 1) %>% 
               ungroup()
 
-  warning(sprintf("Removed %s pairs with multiple IDs out of %s", orig_n - nrow(mf_pairs), orig_n))
+  warning(sprintf("Removed %s pairs with multiple IDs out of %s", 
+                    orig_n - nrow(mf_pairs), orig_n))
   stopifnot(all(mf_pairs$female.f == TRUE))
-  
-  mf_pairs$EA3.m <- mf_pairs$EA3_excl_23andMe_UK_resid.m
-  mf_pairs$EA3.f <- mf_pairs$EA3_excl_23andMe_UK_resid.f
-
-  mf_pairs$couple_id <- paste0(mf_pairs$ID.m, "_", mf_pairs$ID.f)
   
   mf_pairs
 }
