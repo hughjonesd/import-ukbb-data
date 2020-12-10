@@ -451,22 +451,25 @@ subset_resid_scores <- function (resid_scores_raw, famhist, score_names) {
 
 
 
-add_data_to_pairs <- function (pairs_df, famhist, resid_scores, 
+add_data_to_pairs <- function (pairs_df, famhist, resid_scores = NULL, 
                                  suffix = c(".x", ".y")) {
 
-    fhs <- famhist %>% 
-                    left_join(resid_scores, by = "f.eid") %>% 
-                    dplyr::select(
-                      f.eid, f.6138.0.0, matches("f.6141"), female,
-                      matches("_resid$"), nbro, nsis, sib_group,
-                      n_sibs, birth_order, university, age_at_recruitment, YOB,
-                      age_fulltime_edu, age_fte_cat, income_cat, 
-                      birth_mon, n_children, fath_age_birth, moth_age_birth,
-                      first_job_pay, sr_health, illness, fluid_iq, height, 
-                      f.20074.0.0, f.20075.0.0, f.699.0.0,
-                      f.709.0.0, f.670.0.0, f.680.0.0, f.52.0.0, f.53.0.0, 
-                      f.54.0.0, f.6139.0.0, f.6140.0.0, f.728.0.0
-                    )
+  if (! is.null(resid_scores)) {
+    famhist %<>% left_join(resid_scores, by = "f.eid")
+  }
+  
+  fhs <- famhist %>% 
+                  dplyr::select(
+                    f.eid, f.6138.0.0, matches("f.6141"), female,
+                    matches("_resid$"), nbro, nsis, sib_group,
+                    n_sibs, birth_order, university, age_at_recruitment, YOB,
+                    age_fulltime_edu, age_fte_cat, income_cat, 
+                    birth_mon, n_children, fath_age_birth, moth_age_birth,
+                    first_job_pay, sr_health, illness, fluid_iq, height, 
+                    f.20074.0.0, f.20075.0.0, f.699.0.0,
+                    f.709.0.0, f.670.0.0, f.680.0.0, f.52.0.0, f.53.0.0, 
+                    f.54.0.0, f.6139.0.0, f.6140.0.0, f.728.0.0
+                  )
 
   pairs_df %<>% 
             left_join(fhs, by = c(eid.x = "f.eid")) %>% 
@@ -476,7 +479,7 @@ add_data_to_pairs <- function (pairs_df, famhist, resid_scores,
 }
 
 
-make_mf_pairs <- function (mf_pairs_file, famhist, resid_scores, ashe_income) {
+make_mf_pairs <- function (mf_pairs_file, famhist, resid_scores = NULL, ashe_income) {
   famhist <- add_ashe_income(famhist, ashe_income)
   
   mf_pairs <- readr::read_csv(mf_pairs_file)
@@ -486,6 +489,21 @@ make_mf_pairs <- function (mf_pairs_file, famhist, resid_scores, ashe_income) {
   mf_pairs <- add_data_to_pairs(mf_pairs, famhist, resid_scores, 
                                   suffix = c(".m", ".f"))
 
+  mf_pairs %<>% 
+              add_count(ID.m, name = "matches.m") %>%
+              add_count(ID.f, name = "matches.f") %>% 
+              mutate(
+                same_rent    = f.680.0.0.f  == f.680.0.0.m, 
+                same_time_hh = f.699.0.0.f  == f.699.0.0.m,
+                same_n_kids  = n_children.f == n_children.m,
+                same_centre  = f.54.0.0.f   == f.54.0.0.m,
+                same_day     = f.53.0.0.f   == f.53.0.0.m,
+                w_spouse.f   = f.6141.0.0.f == 1,
+                w_spouse.m   = f.6141.0.0.m == 1,
+                age_diff     = age_at_recruitment.m - age_at_recruitment.f,
+                heterosexual = female.m != female.f
+              ) 
+  
   mf_pairs$EA3.m <- mf_pairs$EA3_excl_23andMe_UK_resid.m
   mf_pairs$EA3.f <- mf_pairs$EA3_excl_23andMe_UK_resid.f
 
@@ -498,28 +516,46 @@ make_mf_pairs <- function (mf_pairs_file, famhist, resid_scores, ashe_income) {
 filter_mf_pairs <- function (mf_pairs) {
   # removed f.670 and f.728 because they didn't help predict "having the same kid".
   mf_pairs %<>% filter(
-                  f.680.0.0.f  == f.680.0.0.m,  # same rent/own status
-                  f.699.0.0.f  == f.699.0.0.m,  # same length of time in hh
-                  f.709.0.0.f  == f.709.0.0.m,  # same n occupants of hh
-                  n_children.f == n_children.m, # same n kids
-                  f.54.0.0.f   == f.54.0.0.m,   # same assessment centre 
-                  f.53.0.0.f   == f.53.0.0.m,   # attended assessment same day
-                  f.6141.0.0.f == 1,            # both living with spouse
-                  f.6141.0.0.m == 1,            #   "     "     "    "
-                  female.m != female.f,         # heterosexual couples only
+                  same_rent,    # same rent/own status
+                  same_time_hh, # same length of time in hh
+                  same_n_kids,  # same n kids
+                  same_centre,  # same assessment centre 
+                  same_day,     # attended assessment same day
+                  w_spouse.m,   # both living with spouse
+                  w_spouse.f,   #   "     "     "    "
+                  heterosexual, # heterosexual couples only
                 )
   orig_n <- nrow(mf_pairs)
   # remove pairs with duplications
   mf_pairs %<>% 
-              group_by(ID.m) %>% 
-              filter(n() == 1) %>% 
-              group_by(ID.f) %>% 
-              filter(n() == 1) %>% 
-              ungroup()
-
+              add_count(ID.m, name = "n.m") %>% 
+              add_count(ID.m, name = "n.f") %>% 
+              filter(n.m == 1, n.f == 1) %>% 
+              select(-n.m, -n.f)
+              
   warning(sprintf("Removed %s pairs with multiple IDs out of %s", 
                     orig_n - nrow(mf_pairs), orig_n))
   stopifnot(all(mf_pairs$female.f == TRUE))
   
   mf_pairs
+}
+
+
+make_pairs_twice <- function (pairs_df, suffix = c(".x", ".y")) {
+  x_pattern <- paste0("\\", suffix[1], "$")
+  y_pattern <- paste0("\\", suffix[2], "$")
+  
+  # order matters here:
+  pairs_df_rebadged <- pairs_df
+  names(pairs_df) <- sub(x_pattern, "\\.x", names(pairs_df))
+  names(pairs_df) <- sub(y_pattern, "\\.y", names(pairs_df))
+  
+  names(pairs_df_rebadged) <- sub(x_pattern, "\\.tmp", names(pairs_df_rebadged))
+  names(pairs_df_rebadged) <- sub(y_pattern, "\\.x", names(pairs_df_rebadged))
+  names(pairs_df_rebadged) <- sub("\\.tmp$", "\\.y", names(pairs_df_rebadged))
+  
+  pairs_twice <- bind_rows(pairs_df, pairs_df_rebadged)
+  pairs_twice$x <- ifelse(pairs_twice$female.x, "Female", "Male")
+  
+  pairs_twice
 }
