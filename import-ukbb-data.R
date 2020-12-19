@@ -233,6 +233,12 @@ clean_famhist <- function (famhist, score_names, sib_groups) {
   # we get very few extra cases from adding f.2946.1.0 etc, and it makes calculating
   # father's year of birth more complex
   
+  # 4 polygenic scores were reverse coded. We reverse them back:
+  famhist$ai_substance_use  <- famhist$ai_substance_use * -1
+  famhist$dpw_substance_use <- famhist$dpw_substance_use * -1
+  famhist$cpd_substance_use <- famhist$cpd_substance_use * -1
+  famhist$si_substance_use  <- famhist$si_substance_use * -1
+  
   # -10 means less than a year, we call that 0 full years
   famhist$f.699.0.0[famhist$f.699.0.0 == -10] <- 0
   famhist$f.699.1.0[famhist$f.699.1.0 == -10] <- 0
