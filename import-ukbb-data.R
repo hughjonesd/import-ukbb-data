@@ -270,10 +270,10 @@ clean_famhist <- function (famhist, score_names, sib_groups) {
   # Field 6138". So, we impute this to be 21.
   famhist$age_fulltime_edu[is.na(famhist$age_fulltime_edu) & famhist$edu_qual.0.0 == 1] <- 21
   
-  # TODO: ask Abdel how edu_qual was made up. Seems to be a "max" of all the
+  # edu_qual seems to be a "max" of all the
   # individual edu_qual.x.y's; these are just f.6138.x.y.
-  # TODO: that doesn't work!!! Warn Abdel.
-  # Currently using edu_qual.0.0
+  # But that doesn't work!!! Warn Abdel.
+  # I just use edu_qual.0.0
   famhist$university <- famhist$edu_qual.0.0 == 1
   famhist$income_cat <- famhist$f.738.0.0
   
@@ -343,17 +343,27 @@ clean_famhist <- function (famhist, score_names, sib_groups) {
   famhist$birth_order[famhist$n_sibs == 1] <- 0
   # number of older siblings, plus one:
   famhist$birth_order <- famhist$birth_order + 1
-  # TODO: how does this come about??? Stupid answers?
+  # About 140 rows, just seems to be fat fingers or out-by-one answers
   famhist$birth_order[famhist$birth_order > famhist$n_sibs] <- NA
-  # TODO: why is birth_order often NaN?
-  # TODO: why is f.5057 often NA when n_sibs == 1? And why often NA in general
+  # birth_order is often NaN because question 5057 was introduced partway 
+  # through fieldwork
+  # f.5057 is often NA when n_sibs == 1; possibly due to adoption
   
-  # TODO: minimum fath_age_birth is 3, moth_age_birth is 0... Why?
+  # One case where father was "only 3 years older than self"; one where
+  # mother was "same age".
+  # Otherwise, answers were reconfirmed if the age difference was less than 14
+  # and rejected if less than 10. 
+  # We do the same.
   famhist$fath_age <- famhist$f.2946.0.0
   famhist$moth_age <- famhist$f.1845.0.0
   famhist$fath_age_birth <- famhist$fath_age - famhist$age_at_recruitment
   famhist$moth_age_birth <- famhist$moth_age - famhist$age_at_recruitment
+  famhist$fath_age_birth[famhist$fath_age_birth < 10] <- NA
+  famhist$moth_age_birth[famhist$moth_age_birth < 10] <- NA
+  famhist$par_age_birth <- rowMeans(famhist[, c("moth_age_birth", "fath_age_birth")], 
+                                      na.rm = TRUE)
 
+  
   # TODO: get f.20191, it is the touchscreen equivalent and will have more data
   famhist$fluid_iq <- rowMeans(famhist %>% select(starts_with("f.20016")), na.rm = TRUE)
   
@@ -375,7 +385,7 @@ clean_famhist <- function (famhist, score_names, sib_groups) {
 
   famhist[score_names] <- scale(famhist[score_names])
 
-  # TODO: ask Abdel for job code f.20277
+  # TODO: ask Abdel for job code f.20277 (job code at visit, widely available)
   # famhist %<>% left_join(ashe_income, by = c("f.20277" = "Code"))
   
   famhist %<>% left_join(sib_groups, by = c("f.eid" = "id"))
@@ -389,7 +399,7 @@ add_ashe_income <- function (famhist, ashe_income) {
 
   famhist %<>% 
         mutate(
-          across(matches("22617"), Negate(is.na), .names = "{.col}_not_na")
+          across(matches("22617"), Negate(is.na), .names = "{col}_not_na")
         ) %>% 
         mutate(
           last_job = rowSums(across(matches("22617.*_not_na"))),
@@ -471,6 +481,7 @@ add_data_to_pairs <- function (pairs_df, famhist, resid_scores = NULL,
                     n_sibs, birth_order, university, age_at_recruitment, YOB,
                     age_fulltime_edu, age_fte_cat, income_cat, 
                     birth_mon, n_children, fath_age_birth, moth_age_birth,
+                    par_age_birth,
                     first_job_pay, sr_health, illness, fluid_iq, height, 
                     f.20074.0.0, f.20075.0.0, f.699.0.0,
                     f.709.0.0, f.670.0.0, f.680.0.0, f.52.0.0, f.53.0.0, 
