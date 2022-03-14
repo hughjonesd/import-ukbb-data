@@ -333,6 +333,16 @@ clean_famhist <- function (famhist, score_names, sib_groups) {
   famhist$nsis <- pmax(famhist$f.1883.0.0, famhist$f.1883.1.0, 
                        famhist$f.1883.2.0, na.rm = TRUE)
   famhist$n_sibs <- famhist$nbro + famhist$nsis + 1
+  
+  
+  famhist %<>% 
+        group_by(birth_year) %>% 
+        mutate(
+          RLRS = n_children/mean(n_children, na.rm = TRUE),
+          RLRS_parents = n_sibs/weighted.mean(n_sibs, 1/n_sibs, na.rm = TRUE)
+        ) %>% 
+        ungroup()
+  
   # a few people give varying answers, we assume median is fine.
   # including later answers picks up c. 10K extra people.
   # some people have a non-integer median; we round down.
