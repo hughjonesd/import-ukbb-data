@@ -29,6 +29,7 @@ famhist_files  <- file.path(data_dir, c(
                     "david.family_history.traits.18052020.out.csv",
                     "david.family_history.traits.17062020.out.csv",
                     "david.birthinfo.traits.14072020.out.csv",
+                    "david.02052022.out.csv",
                     "david.traits.03112020.out.csv",
                     "david_traits.18112020.I.csv.out.csv",
                     "david_traits.18112020.II.csv.out.csv",
