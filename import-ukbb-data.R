@@ -496,7 +496,8 @@ add_data_to_pairs <- function (pairs_df, famhist, resid_scores = NULL,
                     first_job_pay, sr_health, illness, fluid_iq, height, 
                     f.20074.0.0, f.20075.0.0, f.699.0.0,
                     f.709.0.0, f.670.0.0, f.680.0.0, f.52.0.0, f.53.0.0, 
-                    f.54.0.0, f.6139.0.0, f.6140.0.0, f.728.0.0
+                    f.54.0.0, f.6139.0.0, f.6140.0.0, f.728.0.0,
+                    weights
                   )
 
   pairs_df %<>% 
