@@ -54,7 +54,7 @@ negative_to_na <- function (x) {
 
 
 import_pcs <- function (pcs_file) {
-  pcs <- read_table2(pcs_file)
+  pcs <- read_table(pcs_file)
   pc_names <- grep("PC", names(pcs), value = TRUE)
   pcs[pc_names] <- scale(pcs[pc_names])
   names(pcs) <- sub("IID", "eid", names(pcs))
@@ -162,7 +162,7 @@ import_ashe_income <- function (ashe_income_file) {
 
 
 make_relatedness <- function (relatedness_file) {
-  relatedness <- read_table2(relatedness_file, col_names = TRUE)
+  relatedness <- read_table(relatedness_file, col_names = TRUE)
 
   relatedness %<>% mutate(
                      relation = santoku::chop(Kinship,
@@ -314,7 +314,7 @@ clean_famhist <- function (famhist, score_names, sib_groups) {
                         na.rm = TRUE
                       )
   famhist$age_flb_cat <- santoku::chop_equally(famhist$age_flb, 3, 
-                                               labels = lbl_discrete("-"))
+                                               labels = santoku::lbl_discrete("-"))
   
   famhist$flb_cat <- santoku::fillet(famhist$age_flb, c(13, 20, 23, 26, 30, 47))
   famhist$flb_cat %<>% forcats::fct_expand("No children")
